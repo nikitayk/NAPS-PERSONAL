@@ -10,7 +10,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "NAPS - Navigate and Plan Smartly",
   description: "AI-Driven Financial Literacy and Fraud Detection",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({

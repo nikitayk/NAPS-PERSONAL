@@ -21,7 +21,10 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <div className="bg-cyber-primary text-black font-bold text-xl p-1 rounded">NAPS</div>
+            {/* Perfectly circular, centered NAPS logo */}
+            <div className="flex items-center justify-center w-10 h-10 bg-cyber-primary text-black font-bold text-xl rounded-full">
+              NAPS
+            </div>
             <span className="sr-only md:not-sr-only md:inline-block text-sm text-cyber-primary cyber-glow">
               Navigate and Plan Smartly
             </span>
@@ -111,9 +114,10 @@ export function Header() {
             )}
           </div>
 
+          {/* Avatar with empty fallback (no "N" will show) */}
           <Avatar className="h-8 w-8 border border-cyber-primary animate-pulse-glow cursor-pointer">
             <AvatarImage src="/placeholder-user.jpg" alt="User" />
-            <AvatarFallback className="bg-cyber-dark text-cyber-primary">{user.avatar}</AvatarFallback>
+            <AvatarFallback className="bg-cyber-dark text-cyber-primary" />
           </Avatar>
 
           <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleMenu}>

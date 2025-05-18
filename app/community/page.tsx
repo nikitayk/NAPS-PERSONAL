@@ -12,7 +12,7 @@ export default function CommunityPage() {
   const [currentPost, setCurrentPost] = useState<any>(null)
   const [likedPosts, setLikedPosts] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  
+
   const posts = [
     {
       id: "p1",
@@ -57,7 +57,7 @@ export default function CommunityPage() {
       tags: ["Saving", "Success Story"]
     }
   ]
-  
+
   const handleLikePost = (postId: string) => {
     if (likedPosts.includes(postId)) {
       setLikedPosts(likedPosts.filter(id => id !== postId))
@@ -66,24 +66,24 @@ export default function CommunityPage() {
       addGems(2)
     }
   }
-  
+
   const handleOpenComments = (post: any) => {
     setCurrentPost(post)
     setShowCommentModal(true)
   }
-  
+
   const handleSubmitComment = () => {
     setShowCommentModal(false)
     addGems(5)
     toggleSuccessMessage(true)
   }
-  
+
   const handleSubmitPost = () => {
     setShowNewPostModal(false)
     addGems(10)
     toggleSuccessMessage(true)
   }
-  
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -93,7 +93,7 @@ export default function CommunityPage() {
       }
     }
   }
-  
+
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -106,9 +106,14 @@ export default function CommunityPage() {
       }
     }
   }
-  
+
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid">
       <div className="absolute inset-0 bg-gradient-to-b from-cyber-dark to-black/90 pointer-events-none"></div>
       <div className="relative z-10">
-        <Header />\
+        <Header />
+        {/* Your community page content goes here */}
+      </div>
+    </div>
+  )
+}

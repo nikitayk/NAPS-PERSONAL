@@ -1,5 +1,5 @@
 "use client"
-
+import useFinancialData from "@/hooks/useFinancialData"
 import { useEffect, useState, useRef } from "react"
 import { motion } from "framer-motion"
 import { DollarSign, TrendingUp, Shield, PieChart } from "lucide-react"

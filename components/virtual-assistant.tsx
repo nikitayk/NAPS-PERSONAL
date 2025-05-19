@@ -5,6 +5,8 @@ import { MessageCircle, X, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAppContext } from "@/context/app-context"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL
+
 export function VirtualAssistant() {
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState("")
@@ -14,39 +16,59 @@ export function VirtualAssistant() {
       content: "Hi there! I'm your financial assistant. How can I help you today?",
     },
   ])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const { addGems } = useAppContext()
+  const { addGems, user } = useAppContext()
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!message.trim()) return
 
     // Add user message to conversation
-    setConversation([...conversation, { role: "user", content: message }])
+    setConversation((prev) => [...prev, { role: "user", content: message }])
+    setLoading(true)
+    setError(null)
 
-    // Clear input
-    setMessage("")
+    try {
+      const token = localStorage.getItem("token")
+      const res = await fetch(`${API_URL}/assistant`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message,
+          user: {
+            name: user?.name,
+            gems: user?.gems,
+            streak: user?.streak,
+            avatar: user?.avatar,
+            // Add any other personalization fields you want
+          },
+        }),
+      })
 
-    // Simulate assistant response
-    setTimeout(() => {
-      let response = "I'm sorry, I don't have enough information to help with that yet."
-
-      // Simple pattern matching for demo purposes
-      if (message.toLowerCase().includes("budget")) {
-        response =
-          "Creating a budget is a great first step! Start by tracking your income and expenses, then set realistic spending limits for each category."
-      } else if (message.toLowerCase().includes("fraud")) {
-        response =
-          "To protect yourself from fraud, always verify the source of communications, use strong passwords, and regularly monitor your accounts for suspicious activity."
-      } else if (message.toLowerCase().includes("save") || message.toLowerCase().includes("saving")) {
-        response =
-          "For saving money, try the 50/30/20 rule: 50% for needs, 30% for wants, and 20% for savings and debt repayment."
+      if (!res.ok) {
+        throw new Error("Failed to connect to assistant.")
       }
 
-      setConversation((prev) => [...prev, { role: "assistant", content: response }])
-
-      // Reward user for engaging with the assistant
-      addGems(2)
-    }, 1000)
+      const data = await res.json()
+      setConversation((prev) => [
+        ...prev,
+        { role: "assistant", content: data.reply || "Sorry, I couldn't find an answer for that." },
+      ])
+      addGems(2) // Reward user for engaging
+    } catch (err) {
+      setConversation((prev) => [
+        ...prev,
+        { role: "assistant", content: "Sorry, I couldn't connect to the assistant right now." },
+      ])
+      setError("Failed to connect to assistant.")
+    } finally {
+      setLoading(false)
+      setMessage("")
+    }
   }
 
   return (
@@ -81,6 +103,20 @@ export function VirtualAssistant() {
                 </div>
               </div>
             ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] p-3 rounded-lg bg-cyber-primary/10 text-cyber-primary animate-pulse">
+                  Thinking...
+                </div>
+              </div>
+            )}
+            {error && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] p-3 rounded-lg bg-red-500/20 text-red-400">
+                  {error}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-3 border-t border-cyber-primary/20">
@@ -92,11 +128,13 @@ export function VirtualAssistant() {
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                 placeholder="Ask a financial question..."
                 className="flex-1 bg-cyber-dark border border-cyber-primary/30 rounded p-2 text-sm focus:outline-none focus:border-cyber-primary"
+                disabled={loading}
               />
               <Button
                 className="bg-cyber-primary text-black hover:bg-cyber-primary/90"
                 size="icon"
                 onClick={handleSendMessage}
+                disabled={loading}
               >
                 <Send className="h-4 w-4" />
               </Button>

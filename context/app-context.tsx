@@ -1,9 +1,16 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import axios from "axios"
 
-type User = {
+const API_URL = process.env.NEXT_PUBLIC_API_URL
+
+// --- Type Definitions ---
+// Adjust these to match your backend data shape
+
+export interface User {
+  id: string
   name: string
   gems: number
   streak: number
@@ -14,19 +21,20 @@ type User = {
   }
   completedLessons: string[]
   avatar: string
+  // Add any other fields your backend returns
 }
 
-type Transaction = {
+export interface Transaction {
   id: string
   merchant: string
   amount: number
   date: string
-  time: string
-  isFraudulent: boolean
-  category: string
+  time?: string
+  isFraudulent?: boolean
+  category?: string
 }
 
-type Challenge = {
+export interface Challenge {
   id: string
   title: string
   description: string
@@ -35,7 +43,7 @@ type Challenge = {
   type: "fraud" | "budget" | "savings"
 }
 
-type Notification = {
+export interface Notification {
   id: string
   title: string
   message: string
@@ -43,8 +51,9 @@ type Notification = {
   date: string
 }
 
-interface AppContextType {
-  user: User
+// Define the context type
+export interface AppContextType {
+  user: User | null
   transactions: Transaction[]
   challenges: Challenge[]
   notifications: Notification[]
@@ -71,161 +80,131 @@ interface AppContextType {
   checkFraudulentTransaction: (id: string) => boolean
 }
 
-const defaultUser: User = {
-  name: "User",
-  gems: 245,
-  streak: 7,
-  progress: {
-    budgeting: 60,
-    fraud: 25,
-    overall: 42,
-  },
-  completedLessons: ["intro-budgeting", "create-budget", "track-expenses", "budget-tools"],
-  avatar: "JS",
-}
-
-const defaultTransactions: Transaction[] = [
-  {
-    id: "t1",
-    merchant: "Coffee Shop",
-    amount: 4.5,
-    date: "May 15, 2023",
-    time: "9:30 AM",
-    isFraudulent: false,
-    category: "food",
-  },
-  {
-    id: "t2",
-    merchant: "Amazon",
-    amount: 29.99,
-    date: "May 15, 2023",
-    time: "2:15 PM",
-    isFraudulent: false,
-    category: "shopping",
-  },
-  {
-    id: "t3",
-    merchant: "International Transfer",
-    amount: 199.99,
-    date: "May 15, 2023",
-    time: "3:42 AM",
-    isFraudulent: true,
-    category: "transfer",
-  },
-]
-
-const defaultChallenges: Challenge[] = [
-  {
-    id: "c1",
-    title: "Spot the Fraud",
-    description: "Identify which transaction might be fraudulent",
-    reward: 20,
-    completed: false,
-    type: "fraud",
-  },
-  {
-    id: "c2",
-    title: "Budget Challenge",
-    description: "Create a monthly budget with limited resources",
-    reward: 30,
-    completed: false,
-    type: "budget",
-  },
-  {
-    id: "c3",
-    title: "Savings Goal",
-    description: "Plan how to reach a savings target",
-    reward: 25,
-    completed: false,
-    type: "savings",
-  },
-]
-
-const defaultNotifications: Notification[] = [
-  {
-    id: "n1",
-    title: "New Challenge Available",
-    message: "Complete today's fraud detection challenge to earn 20 gems!",
-    read: false,
-    date: "1 hour ago",
-  },
-  {
-    id: "n2",
-    title: "Streak Reminder",
-    message: "Don't forget to complete a lesson today to maintain your 7-day streak!",
-    read: true,
-    date: "5 hours ago",
-  },
-]
+// --- Context Implementation ---
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>(defaultUser)
-  const [transactions, setTransactions] = useState<Transaction[]>(defaultTransactions)
-  const [challenges, setChallenges] = useState<Challenge[]>(defaultChallenges)
-  const [notifications, setNotifications] = useState<Notification[]>(defaultNotifications)
+  const [user, setUser] = useState<User | null>(null)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null)
   const [showFraudAlert, setShowFraudAlert] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [currentLesson, setCurrentLesson] = useState<string | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const addGems = (amount: number) => {
-    setUser((prev) => ({
-      ...prev,
-      gems: prev.gems + amount,
-    }))
-  }
-
-  const incrementStreak = () => {
-    setUser((prev) => ({
-      ...prev,
-      streak: prev.streak + 1,
-    }))
-  }
-
-  const completeLesson = (lessonId: string) => {
-    if (!user.completedLessons.includes(lessonId)) {
-      setUser((prev) => ({
-        ...prev,
-        completedLessons: [...prev.completedLessons, lessonId],
-      }))
+  // Fetch user, transactions, challenges, notifications from backend on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+        if (!token) {
+          setIsLoading(false)
+          return
+        }
+        const [userRes, txRes, chRes, notifRes] = await Promise.all([
+          axios.get(`${API_URL}/users/me`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}/challenges`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}/notifications`, { headers: { Authorization: `Bearer ${token}` } }),
+        ])
+        setUser(userRes.data.data)
+        setTransactions(txRes.data.data || [])
+        setChallenges(chRes.data.data || [])
+        setNotifications(notifRes.data.data || [])
+      } catch (err) {
+        // Optionally, set error state here
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
+    fetchData()
+  }, [])
 
+  // Add gems and sync with backend
+  const addGems = useCallback(async (amount: number) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token || !user) return
+    try {
+      const res = await axios.post(
+        `${API_URL}/users/add-gems`,
+        { amount },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setUser(res.data.data)
+    } catch {
+      // Optionally, set error state here
+    }
+  }, [user])
+
+  // Increment streak and sync with backend
+  const incrementStreak = useCallback(async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token || !user) return
+    try {
+      const res = await axios.post(
+        `${API_URL}/users/increment-streak`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setUser(res.data.data)
+    } catch {
+      // Optionally, set error state here
+    }
+  }, [user])
+
+  // Complete lesson and sync with backend
+  const completeLesson = useCallback(async (lessonId: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token || !user) return
+    try {
+      const res = await axios.post(
+        `${API_URL}/lessons/${lessonId}/complete`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setUser(res.data.data)
+    } catch {
+      // Optionally, set error state here
+    }
+  }, [user])
+
+  // Select transaction (UI only)
   const selectTransaction = (id: string | null) => {
     setSelectedTransaction(id)
   }
 
-  const markNotificationAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((notification) => (notification.id === id ? { ...notification, read: true } : notification)),
-    )
-  }
+  // Mark notification as read and sync with backend
+  const markNotificationAsRead = useCallback(async (id: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token) return
+    try {
+      await axios.post(
+        `${API_URL}/notifications/${id}/read`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setNotifications((prev) =>
+        prev.map((notification) => (notification.id === id ? { ...notification, read: true } : notification))
+      )
+    } catch {
+      // Optionally, set error state here
+    }
+  }, [])
 
-  const toggleFraudAlert = (show: boolean) => {
-    setShowFraudAlert(show)
-  }
+  // UI toggles (as before)
+  const toggleFraudAlert = (show: boolean) => setShowFraudAlert(show)
+  const toggleSuccessMessage = (show: boolean) => setShowSuccessMessage(show)
+  const toggleMenu = () => setIsMenuOpen((prev) => !prev)
+  const toggleDarkMode = () => setIsDarkMode((prev) => !prev)
+  const setLoading = (loading: boolean) => setIsLoading(loading)
 
-  const toggleSuccessMessage = (show: boolean) => {
-    setShowSuccessMessage(show)
-  }
-
-  const toggleMenu = () => {
-    setIsMenuOpen((prev) => !prev)
-  }
-
-  const toggleDarkMode = () => {
-    setIsDarkMode((prev) => !prev)
-  }
-
-  const setLoading = (loading: boolean) => {
-    setIsLoading(loading)
-  }
-
+  // Fraud check (can be moved to backend for more security)
   const checkFraudulentTransaction = (id: string): boolean => {
     const transaction = transactions.find((t) => t.id === id)
     return transaction?.isFraudulent || false
@@ -273,3 +252,4 @@ export function useAppContext() {
   }
   return context
 }
+

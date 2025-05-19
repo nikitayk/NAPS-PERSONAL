@@ -1,47 +1,45 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import axios from "axios"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Header } from "@/components/header"
 import { Badge } from "@/components/ui/badge"
 
-const lessons = [
-  {
-    id: 1,
-    title: "What is Financial Literacy?",
-    description: "Learn the basics of managing money, saving, and investing.",
-    completed: false,
-  },
-  {
-    id: 2,
-    title: "Recognizing Online Scams",
-    description: "Identify common online fraud tactics and how to avoid them.",
-    completed: false,
-  },
-  {
-    id: 3,
-    title: "Smart Budgeting",
-    description: "Create and manage a budget to achieve your financial goals.",
-    completed: false,
-  },
-  {
-    id: 4,
-    title: "Safe Digital Payments",
-    description: "Learn how to use UPI, cards, and wallets securely.",
-    completed: false,
-  },
-]
+const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 export default function LearnPage() {
-  const [userLessons, setUserLessons] = useState(lessons)
+  const [userLessons, setUserLessons] = useState<any[]>([])
   const [selectedLesson, setSelectedLesson] = useState<number | null>(null)
   const [showLessonModal, setShowLessonModal] = useState(false)
   const [lessonCompleted, setLessonCompleted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  // Fetch lessons and user progress from backend
+  useEffect(() => {
+    const fetchLessons = async () => {
+      setLoading(true)
+      setError("")
+      try {
+        const token = localStorage.getItem("token")
+        const response = await axios.get(`${API_URL}/lessons`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setUserLessons(response.data.data || [])
+      } catch (err) {
+        setError("Failed to load lessons. Please try again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchLessons()
+  }, [])
 
   const completedCount = userLessons.filter((l) => l.completed).length
-  const progress = (completedCount / userLessons.length) * 100
+  const progress = userLessons.length > 0 ? (completedCount / userLessons.length) * 100 : 0
 
   function handleOpenLesson(id: number) {
     setSelectedLesson(id)
@@ -49,14 +47,22 @@ export default function LearnPage() {
     setLessonCompleted(userLessons.find((l) => l.id === id)?.completed ?? false)
   }
 
-  function handleCompleteLesson(id: number) {
-    setUserLessons((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, completed: true } : l))
-    )
-    setLessonCompleted(true)
-    setTimeout(() => {
-      setShowLessonModal(false)
-    }, 800)
+  async function handleCompleteLesson(id: number) {
+    try {
+      const token = localStorage.getItem("token")
+      await axios.post(`${API_URL}/lessons/${id}/complete`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setUserLessons((prev) =>
+        prev.map((l) => (l.id === id ? { ...l, completed: true } : l))
+      )
+      setLessonCompleted(true)
+      setTimeout(() => {
+        setShowLessonModal(false)
+      }, 800)
+    } catch {
+      setError("Failed to mark lesson as complete.")
+    }
   }
 
   function handleCloseModal() {
@@ -79,6 +85,9 @@ export default function LearnPage() {
               <span className="text-cyber-primary font-bold">{completedCount}/{userLessons.length}</span>
             </div>
           </div>
+
+          {loading && <div>Loading lessons...</div>}
+          {error && <div className="text-red-500">{error}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {userLessons.map((lesson) => (
@@ -149,3 +158,4 @@ export default function LearnPage() {
     </div>
   )
 }
+

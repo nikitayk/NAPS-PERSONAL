@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import axios from "axios"
+import { useToast } from "@/components/ui/use-toast"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -85,6 +86,7 @@ export interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { toast } = useToast()
   const [user, setUser] = useState<User | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [challenges, setChallenges] = useState<Challenge[]>([])
@@ -96,11 +98,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Fetch user, transactions, challenges, notifications from backend on mount
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true)
+      setError(null)
       try {
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
         if (!token) {
@@ -118,13 +122,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setChallenges(chRes.data.data || [])
         setNotifications(notifRes.data.data || [])
       } catch (err) {
-        // Optionally, set error state here
+        const message = err instanceof Error ? err.message : "Failed to load data"
+        setError(message)
+        toast({
+          title: "Error",
+          description: message,
+          variant: "destructive",
+        })
       } finally {
         setIsLoading(false)
       }
     }
     fetchData()
-  }, [])
+  }, [toast])
 
   // Add gems and sync with backend
   const addGems = useCallback(async (amount: number) => {
@@ -137,10 +147,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setUser(res.data.data)
-    } catch {
-      // Optionally, set error state here
+      toast({
+        title: "Gems Added!",
+        description: `You earned ${amount} gems!`,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to add gems"
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      })
     }
-  }, [user])
+  }, [user, toast])
 
   // Increment streak and sync with backend
   const incrementStreak = useCallback(async () => {

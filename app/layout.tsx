@@ -6,6 +6,9 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AppProvider } from "@/context/app-context"
 import { ToastProvider } from "@/context/toast-context"
 import { ToastStack } from "@/components/ui/toast-stack"
+import { MarketProvider } from "@/context/market-context"
+import { Toaster } from "@/components/ui/toaster"
+import ConnectionStatus from "@/components/ConnectionStatus"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,8 +28,12 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <ToastProvider>
             <AppProvider>
-              {children}
-              <ToastStack />
+              <MarketProvider>
+                {children}
+                <ToastStack />
+                <Toaster />
+                <ConnectionStatus />
+              </MarketProvider>
             </AppProvider>
           </ToastProvider>
         </ThemeProvider>

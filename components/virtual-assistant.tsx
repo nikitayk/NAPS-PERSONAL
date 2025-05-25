@@ -1,31 +1,46 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { MessageCircle, X, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAppContext } from "@/context/app-context"
+import { format } from "date-fns"
+
+interface Message {
+  role: "user" | "assistant"
+  content: string
+  timestamp: Date
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 export function VirtualAssistant() {
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState("")
-  const [conversation, setConversation] = useState<{ role: "user" | "assistant"; content: string }[]>([
+  const [conversation, setConversation] = useState<Message[]>([
     {
       role: "assistant",
       content: "Hi there! I'm your financial assistant. How can I help you today?",
+      timestamp: new Date(),
     },
   ])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { addGems, user } = useAppContext()
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [conversation])
 
   const handleSendMessage = async () => {
     if (!message.trim()) return
 
     // Add user message to conversation
-    setConversation((prev) => [...prev, { role: "user", content: message }])
+    setConversation((prev) => [...prev, { role: "user", content: message, timestamp: new Date() }])
     setLoading(true)
     setError(null)
 
@@ -44,7 +59,6 @@ export function VirtualAssistant() {
             gems: user?.gems,
             streak: user?.streak,
             avatar: user?.avatar,
-            // Add any other personalization fields you want
           },
         }),
       })
@@ -56,13 +70,21 @@ export function VirtualAssistant() {
       const data = await res.json()
       setConversation((prev) => [
         ...prev,
-        { role: "assistant", content: data.reply || "Sorry, I couldn't find an answer for that." },
+        { 
+          role: "assistant", 
+          content: data.reply || "Sorry, I couldn't find an answer for that.",
+          timestamp: new Date()
+        },
       ])
       addGems(2) // Reward user for engaging
     } catch (err) {
       setConversation((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I couldn't connect to the assistant right now." },
+        { 
+          role: "assistant", 
+          content: "Sorry, I couldn't connect to the assistant right now.",
+          timestamp: new Date()
+        },
       ])
       setError("Failed to connect to assistant.")
     } finally {
@@ -70,6 +92,20 @@ export function VirtualAssistant() {
       setMessage("")
     }
   }
+
+  const groupMessagesByDate = (messages: Message[]) => {
+    const groups: { [key: string]: Message[] } = {}
+    messages.forEach((message) => {
+      const date = format(message.timestamp, "MMMM d, yyyy")
+      if (!groups[date]) {
+        groups[date] = []
+      }
+      groups[date].push(message)
+    })
+    return groups
+  }
+
+  const messageGroups = groupMessagesByDate(conversation)
 
   return (
     <>
@@ -92,21 +128,33 @@ export function VirtualAssistant() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
-            {conversation.map((msg, index) => (
-              <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
-                    msg.role === "user" ? "bg-cyber-primary/20 text-white" : "bg-cyber-primary/10 text-cyber-primary"
-                  }`}
-                >
-                  {msg.content}
-                </div>
+            {Object.entries(messageGroups).map(([date, messages]) => (
+              <div key={date} className="space-y-4">
+                <div className="text-xs text-center text-muted-foreground">{date}</div>
+                {messages.map((msg, index) => (
+                  <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[80%] p-3 rounded-lg ${
+                        msg.role === "user" ? "bg-cyber-primary/20 text-white" : "bg-cyber-primary/10 text-cyber-primary"
+                      }`}
+                    >
+                      {msg.content}
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {format(msg.timestamp, "HH:mm")}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] p-3 rounded-lg bg-cyber-primary/10 text-cyber-primary animate-pulse">
-                  Thinking...
+                <div className="max-w-[80%] p-3 rounded-lg bg-cyber-primary/10 text-cyber-primary">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-cyber-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <div className="w-2 h-2 rounded-full bg-cyber-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-2 h-2 rounded-full bg-cyber-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
                 </div>
               </div>
             )}
@@ -117,6 +165,7 @@ export function VirtualAssistant() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="p-3 border-t border-cyber-primary/20">
